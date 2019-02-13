@@ -1,0 +1,223 @@
+/* Criação do banco */
+
+CREATE DATABASE HOSPITAL;
+USE HOSPITAL;
+
+/* CRIAÇÃO DE TABELAS */
+
+CREATE TABLE PACIENTE (
+  IDPaciente INTEGER PRIMARY KEY AUTO_INCREMENT,
+  Nome VARCHAR(255) NOT NULL,
+  RG VARCHAR(15),
+  CPF VARCHAR(11),      /*CPF e RG não devem ser nulos ao mesmo tempo.*/
+  Sexo ENUM('M', 'F'),  /*Não possuem a clausula NOT NULL pois uma trigger lida com isso.*/
+  Email VARCHAR(255),
+  DataNascimento DATE
+);
+
+CREATE TABLE ENDERECO (
+  IDEndereco INTEGER PRIMARY KEY AUTO_INCREMENT,
+  ID_Paciente INTEGER NOT NULL,
+  Pais VARCHAR(50) NOT NULL,
+  Estado VARCHAR(50) NOT NULL,
+  Cidade VARCHAR(50) NOT NULL,
+  Bairro VARCHAR(50),
+  Rua VARCHAR(100) NOT NULL,
+  Numero VARCHAR(6),
+  Complemento VARCHAR(50),
+  CEP CHAR(8) NOT NULL
+);
+
+CREATE TABLE TELEFONE (
+  IDTelefone INTEGER PRIMARY KEY AUTO_INCREMENT,
+  ID_Paciente INTEGER NOT NULL,
+  DDD CHAR(2) NOT NULL,
+  Tipo ENUM('RES','CEL'),
+  Numero VARCHAR(14)
+);
+
+CREATE TABLE MEDICO (
+  IDMedico INTEGER PRIMARY KEY AUTO_INCREMENT,
+  Nome VARCHAR(255) NOT NULL,
+  Sexo ENUM('M','F') NOT NULL,
+  CRM CHAR(5) NOT NULL,
+  CPF CHAR(11) NOT NULL
+);
+
+CREATE TABLE CONSULTA (
+  IDConsulta INTEGER PRIMARY KEY AUTO_INCREMENT,
+  ID_Paciente INTEGER NOT NULL,
+  ID_Medico INTEGER NOT NULL,
+  DataAtendimento DATE NOT NULL,
+  Hora TIME NOT NULL,
+  Diagnostico TEXT NOT NULL
+);
+
+CREATE TABLE INTERNACAO (
+  IDInternacao INTEGER PRIMARY KEY AUTO_INCREMENT,
+  ID_Consulta INTEGER NOT NULL,
+  Andar VARCHAR(2) NOT NULL,
+  Quarto VARCHAR(4) NOT NULL,
+  DataEntrada DATE NOT NULL,
+  HoraEntrada TIME NOT NULL,
+  DataSaida DATE NOT NULL,
+  HoraSaida TIME NOT NULL
+);
+
+
+
+
+
+
+/* DEFINIÇÃO DE CONSTRAINTS */
+
+/* UNIQUE */
+
+ALTER TABLE PACIENTE
+ADD CONSTRAINT UNIQUE_PACIENTE_RG UNIQUE(RG);
+
+ALTER TABLE PACIENTE
+ADD CONSTRAINT UNIQUE_PACIENTE_CPF UNIQUE(CPF);
+
+ALTER TABLE PACIENTE
+ADD CONSTRAINT UNIQUE_PACIENTE_EMAIL UNIQUE(Email);
+
+ALTER TABLE ENDERECO
+ADD CONSTRAINT UNIQUE_ENDERECO_ID_PACIENTE UNIQUE(ID_Paciente);
+
+ALTER TABLE TELEFONE
+ADD CONSTRAINT UNIQUE_TELEFONE_NUMERO UNIQUE(Tipo);
+
+ALTER TABLE MEDICO
+ADD CONSTRAINT UNIQUE_MEDICO_CRM UNIQUE(CRM);
+
+ALTER TABLE MEDICO
+ADD CONSTRAINT UNIQUE_MEDICO_CPF UNIQUE(CPF);
+
+ALTER TABLE INTERNACAO
+ADD CONSTRAINT UNIQUE_INTERNACAO_ID_CONSULTA UNIQUE(ID_Consulta);
+
+/* FOREIGN KEYS */
+
+ALTER TABLE ENDERECO
+ADD CONSTRAINT FK_ENDERECO_PACIENTE
+FOREIGN KEY(ID_Paciente) REFERENCES PACIENTE(IDPaciente);
+
+ALTER TABLE TELEFONE
+ADD CONSTRAINT FK_TELEFONE_PACIENTE
+FOREIGN KEY(ID_Paciente) REFERENCES PACIENTE(IDPaciente);
+
+ALTER TABLE CONSULTA
+ADD CONSTRAINT FK_CONSULTA_PACIENTE
+FOREIGN KEY(ID_Paciente) REFERENCES PACIENTE(IDPaciente);
+
+ALTER TABLE CONSULTA
+ADD CONSTRAINT FK_CONSULTA_MEDICO
+FOREIGN KEY(ID_Medico) REFERENCES MEDICO(IDMedico);
+
+ALTER TABLE INTERNACAO
+ADD CONSTRAINT FK_INTERNACAO_CONSULTA
+FOREIGN KEY(ID_Consulta) REFERENCES CONSULTA(IDConsulta);
+
+
+/* Criação de triggers */
+/* Duas triggers que garantem que rg e cpf não sejam nulos juntos */
+DELIMITER $
+
+CREATE TRIGGER inserirRGouCPFNOTNULL
+BEFORE INSERT ON PACIENTE
+FOR EACH ROW
+BEGIN
+  IF(NEW.RG IS NULL AND NEW.CPF IS NULL) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'RG e CPF nao podem ser os dois nulos';
+  END IF;
+END$
+
+CREATE TRIGGER updateRGouCPFNOTNULL
+BEFORE UPDATE ON PACIENTE
+FOR EACH ROW
+BEGIN
+  IF(NEW.RG IS NULL AND NEW.CPF IS NULL) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'RG e CPF nao podem ser os dois nulos';
+  END IF;
+END$
+
+DELIMITER ;
+
+
+
+
+
+
+/* Criação de procedures de possível utilidade geral */
+
+
+/* A procedure a seguir PROJETA pacientes de uma dada idade */
+DELIMITER $
+
+CREATE PROCEDURE pacientesIdade(idade INTEGER)
+BEGIN
+  SELECT * FROM PACIENTE WHERE TIMESTAMPDIFF(YEAR, PACIENTE.DataNascimento, CURDATE()) = idade;
+END$
+
+DELIMITER ;
+
+
+
+
+
+
+/* Exemplos de querys */
+
+INSERT INTO PACIENTE(Nome, RG, Sexo, Email, DataNascimento)
+  VALUES('Carlos', '469873214', 'M', 'Carlb12@gmail.com', DATE('1994-01-23'));
+INSERT INTO ENDERECO(ID_Paciente, Pais, Estado, Cidade, Bairro, Rua, Numero, Complemento, CEP)
+  VALUES(1, 'Brasil', 'Minas Gerais', 'Belo Horizonte', 'Lourdes', 'Rua Capitão Maré', '498', 'Casa 3', '8932166');
+INSERT INTO TELEFONE(ID_Paciente, DDD, Tipo, Numero)
+  VALUES(1, '31', 'RES', '41419763');
+
+INSERT INTO MEDICO(Nome, Sexo, CRM, CPF)
+  VALUES ('Gutren', 'M', '55555', '49863212549'), ('Líssia', 'F', '93288', '66321158899'), ('Júlia', 'F', '21531', '49832196333'),
+    ('Lattilus', 'M', '62348', '78633329788'), ('Petrus', 'M', '12354', '10110122211'), ('Garko', 'M', '10410', '10241010100'),
+    ('Yavan', 'M', '30212', '31245501011'), ('Arwen', 'F', '05311', '20510022201'), ('Lefannia', 'F', '20411', '00012100100'),
+    ('Pork', 'M', '10212', '42100510211'), ('Gantus', 'M', '12211', '12043200010'), ('Vakran', 'F', '10242', '20121044402');
+
+INSERT INTO PACIENTE(Nome, CPF, Sexo, Email, DataNascimento)
+  VALUES('Katrina', '40421102300', 'F', 'KTT@gmail.com', DATE('1985-11-10'));
+INSERT INTO ENDERECO(ID_Paciente, Pais, Estado, Cidade, Bairro, Rua, Numero, Complemento, CEP)
+  VALUES(2, 'Brasil', 'Paraíba', 'João Pessoa', 'Bancários', 'Estrada da Rosa', '111', 'Apt 1202', '5563211');
+INSERT INTO TELEFONE(ID_Paciente, DDD, Tipo, Numero)
+  VALUES(2, '83', 'CEL', '965423321');
+
+
+INSERT INTO CONSULTA(ID_Paciente, ID_Medico, DataAtendimento, Hora, Diagnostico)
+  VALUES(1, 10, DATE('2011-01-01'), TIME('22:45:21'), 'Sessão psiquiátrica');
+
+INSERT INTO CONSULTA(ID_Paciente, ID_Medico, DataAtendimento, Hora, Diagnostico)
+  VALUES(2, 10, DATE('2011-01-01'), TIME('14:10:20'), 'Sessão psiquiátrica');
+
+INSERT INTO CONSULTA(ID_Paciente, ID_Medico, DataAtendimento, Hora, Diagnostico)
+  VALUES(1, 10, DATE('2010-08-10'), TIME('12:30:00'), 'Sessão psiquiátrica');
+
+/* Digamos que uma campanha para coletar o rg ou cpf faltante de alguns pacientes está em andamento.
+   Então, a query a seguir projeta tais pacientes e seus respectivos contatos.*/
+SELECT P.Nome, P.CPF, P.RG, P.Sexo, TIMESTAMPDIFF(YEAR, P.DataNascimento, CURDATE()) AS 'Idade', T.DDD, T.Numero
+FROM PACIENTE P
+INNER JOIN TELEFONE T
+ON P.IDPaciente = T.ID_Paciente
+WHERE P.RG IS NULL OR P.CPF IS NULL;
+
+/* Digamos que o médico psiquiatra de ID = 10 se demitiu, portanto, um comunicado para a troca de médico deve chegar
+   a seus pacientes. A query a seguir projeta tais pacientes e seus respectivos contatos para comunicação. */
+SELECT P.Nome as 'Paciente', P.CPF, P.RG, P.Sexo, TIMESTAMPDIFF(YEAR, P.DataNascimento, CURDATE()) AS 'Idade', T.DDD, T.Numero, M.Nome as 'Médico'
+FROM PACIENTE P
+INNER JOIN TELEFONE T
+ON P.IDPaciente = T.ID_Paciente
+INNER JOIN CONSULTA C
+ON P.IDPaciente = C.ID_Paciente
+INNER JOIN MEDICO M
+ON M.IDMedico = C.ID_Medico
+WHERE M.IDMedico = 10
+GROUP BY P.IDPaciente;
